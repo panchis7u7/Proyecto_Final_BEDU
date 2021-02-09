@@ -1,0 +1,12 @@
+name: ProyectoBedu
+title: ProyectoBedu
+username:
+account: carlostnorio
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3591450
+bundleId: 4197874
+url: https://carlostnorio.shinyapps.io/ProyectoBedu/
+when: 1612820178.96193
+asMultiple: FALSE
+asStatic: FALSE

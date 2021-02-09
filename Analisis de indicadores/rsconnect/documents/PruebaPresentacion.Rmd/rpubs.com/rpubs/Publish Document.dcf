@@ -1,0 +1,10 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/722851/167711fed26a4144b705451973416ae8
+bundleId: https://api.rpubs.com/api/v1/document/722851/167711fed26a4144b705451973416ae8
+url: http://rpubs.com/diego-corona/722851
+when: 1612815717.37825

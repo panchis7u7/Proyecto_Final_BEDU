@@ -1,0 +1,56 @@
+---
+subtitle: "Indicadores socio-económicos durante tiempos de Covid-19."
+author:
+  - "Integrantes:"
+  - "Viridiana Escarzaga Solis"
+  - "Carlos Sebastián Madrigal Rodríguez"
+  - "Diego Armando Morales Corona"
+  - "Carlos Rodríguez Tenorio"
+output:
+  ioslides_presentation:
+    logo: BEDU.jpg
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+background-image: url(/cloud/project/data-science-retail.jpg)
+background-size: cover
+
+## Series de tiempo de movilidad.
+
+```{r echo=FALSE, out.width = "700px", out.height="500px",fig.align='center'}
+knitr::include_graphics("/cloud/project/Movilidad_series.png")
+```
+
+## Predicciones sobre movilidad.
+
+```{r echo=FALSE, out.width = "800px", out.height="550px",fig.align='center'}
+knitr::include_graphics("/cloud/project/pred_movilidad.png")
+```
+
+## Series de tiempo para el uso de datos.
+
+```{r echo=FALSE, out.width = "800px", out.height="550px",fig.align='center'}
+knitr::include_graphics("/cloud/project/internet_series.png")
+```
+
+## Pronósticos para el uso de datos. 
+
+```{r echo=FALSE, out.width = "800px", out.height="550px",fig.align='center'}
+knitr::include_graphics("/cloud/project/pred_internet.png")
+```
+
+## Serie de tiempo de la fluctuación de dólar. 
+
+```{r echo=FALSE, out.width = "650px", out.height="400px",fig.align='center'}
+knitr::include_graphics("/cloud/project/dolar_serie1.png")
+```
+
+## Pronósticos para tipo de cambio del dólar.
+
+```{r echo=FALSE, out.width = "650px", out.height="400px",fig.align='center'}
+knitr::include_graphics("/cloud/project/predict_dolar1.png")
+```

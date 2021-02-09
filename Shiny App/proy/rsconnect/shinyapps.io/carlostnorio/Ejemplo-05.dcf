@@ -1,0 +1,12 @@
+name: Ejemplo-05
+title: Ejemplo-05
+username:
+account: carlostnorio
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3581589
+bundleId: 4181190
+url: https://carlostnorio.shinyapps.io/Ejemplo-05/
+when: 1612457658.5581
+asMultiple: FALSE
+asStatic: FALSE

@@ -1,0 +1,743 @@
+---
+title: "Proyecto de Estadística y Programación con R."
+
+author:
+  - "Integrantes:"
+  - "- Viridiana Escarzaga Solis"
+  - "- Carlos Sebastián Madrigal Rodríguez"
+  - "- Diego Armando Morales Corona"
+  - "- Carlos Rodríguez Tenorio"
+  
+date: "03 de febrero de 2021"
+output: 
+  html_document:
+    prettydoc::html_pretty:
+      theme: tactile
+      highlight: github
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+  
+  
+```{r, echo=FALSE}
+htmltools::img(src = knitr::image_uri(file.path('/cloud/project/BEDU.jpg')), 
+               alt = 'logo', 
+               style = 'position:absolute; top:0; right:0; padding:10px;')
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE, 
+  comment = ' '
+)
+```
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(knitr)
+library(prettydoc)
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(ggcorrplot)
+library(forecast)
+library(ggfortify)
+library(rsconnect)
+```
+## Introducción.
+
+A partir de los primeros meses de 2020, México ha visto el impacto generado por la pandemia mundial de SARS-COV2. El primer caso confirmado, en México, se registró el 28 de febrero de 2020. Pocos días después el Gobierno Mexicano declaró la llamada [_Jornada Nacional de Sana Distancia_](https://www.gob.mx/salud/documentos/sana-distancia), en la cuál invitaban a la población a permanecer en casa con el fin de evitar una rápida propagación del virus. 
+
+Esta medida, como era de esperarse, tuvo gran impacto en la normalidad de la sociedad implicando problemas socio-económicos, por mencionar algunos: _pérdida de enpleo por parte de algunos sectores de la población o dificultad para ejercerlo, disminución en el salario, imortante disminución en el consumo de servicios, etc._
+
+Dado lo anterior resultá interesante preguntarse: _¿Cómo se ha visto afectados algunos indicadores socieconomicos a lo largo de este periodo de tiempo?_. El presente trabajo busca estudiarlos y analizarlos, mediante el uso de técnicas de series de tiempo, así como pronosticar el comportamiento de estos.
+
+La movilidad se vio limitada, los medios de transporte vieron una reducción en uso significativa, comportamiento que se esperaba ser al contrario cn los tranportes particulares, ya que podían ser una forma más segura de trasladarse de un lugar a otro.
+
+Tras el brote de la COVID-19, cada vez más personas trabajan, estudian y socializan desde sus casas. A lo largo de la cadena de valor de Internet, los operadores de comunicaciones, los proveedores de contenido y servicios en la nube, así como también los puntos de intercambio de Internet (IXP), han experimentado hasta un 60% más de tráfico de Internet en comparación con el tráfico previo al brote. En esta situación sin precedentes, la resiliencia y la capacidad de las redes de banda ancha se han vuelto aún más esenciales. [(consulte mas aqui)](https://asiet.lat/magazine-digital/como-la-covid-19-afecto-el-trafico-de-internet-y-que-aprendimos-hasta-ahora/)
+
+Por otra parte, el dólar es conosiderado un referente en la economía mundial particularmente para las economías Latinoamericanas, cuyas monedas se han visto depreciadas a lo largo de todo este periodo, afectando para bien o para mal otras industrias, repercutiendo tanto en la inflación como en la deuda publica.  
+
+" El desarrollo de la pandemia y la expectativa de recuperación económica global son los principales factores fundamentales que determinan el tipo de cambio", esta es otra variable de estudio en este docuemnto. 
+
+## Información sobre los Datos.
+
+Se buscaron diversas fuentes de información de las cuales obtener las series de tiempo:
+  
+- Los indicadores de movilidad se extrajeron de el [_Portal de Datos Abiertos_](https://datos.cdmx.gob.mx/group/movilidad), en el cual se encontraban series de tiempo de las afluencias en diversos medios de tránsporte en CDMX, registradas desde finales de marzo de 2020 hasta finales de enero de 2021. 
+
+Los datos de esta serie son diferencias porcentuales diarias respecto a lo definido como un _día típico_. La definición de este día típico se baso en un histórico desde 2018 para calcular la afuencia promedio para cada día de la semana ajustados con la afluencia registrada durante la primera quincena de marzo de 2020. [Más información](https://www.semovi.cdmx.gob.mx/tramites-y-servicios/transparencia/preguntas-frecuentes/preguntas-frecuentes-covid-19/movilidad-durante-la-emergencia-sanitaria-covid-19)
+
+- Los indicadores de movilidad de los vehículos particulares [(obtenidos aquí)](https://datos.cdmx.gob.mx/dataset/diferencias-porcentuales-en-el-transito-vehicular-en-la-cdmx-tomtom/resource/cd8b65b8-8cbf-4166-91c8-d72ac7e09a71), se calculan de una manera similar a los indices de movilidad en el transporte, con la diferencia de que la alfuencia en un _día típico_ se calculó respecto a un histórico desde la segunga semana de enero y febrero de 2020 [Más información](https://www.semovi.cdmx.gob.mx/tramites-y-servicios/transparencia/preguntas-frecuentes/preguntas-frecuentes-covid-19/movilidad-durante-la-emergencia-sanitaria-covid-19) 
+
+- El trafico diario de internet se extrajo del portal abierto de la comision de regulacion de comunicaciones. Varios de los proveedores de servicios digitales son reconocidos y usados a lo largo de todo el continente americano. [(consulte mas aqui)](https://www.postdata.gov.co/)
+
+La información de trafico diario reportado por los Proveedores de Servicio de Internet, fue recopilada desde el 30 de marzo del 2020 hasta el 26 de enero del 2021. [(Obtenidos aqui)](https://www.postdata.gov.co/dataset/tr%C3%A1fico-de-internet-covid-19/resource/c9d5111e-d303-4d7e-8df1-a8f0766ba439#{})
+
+La base de datos proporcionada, nos brinda la cantidad de datos (en GB) que circulan a traves de distintos proveedores de servicios digitales por medio de su infraestructura de red. Este dataset contempla distintos provedores que presentan comportamientos identicos a lo largo e la pandemia, por lo cual podrian ser omitidos para evitar estudiar informacion muy parecida en las series.
+
+- El data set a analizar (de las cambios del precio del dólar) contempla la fluctuación del tipo de cambio a partir del viernes 20 de marzo cuando se decreto la cuarentena y las medidas de quedarse en casa, y de solo contemplar actividades escenciales se llevaron a cabo y concluye el ultimo día del año 2020. 
+
+La apertura y el cierre por día son indicadores que da la bolsa de valores para poder observar la diferencia entre estos de acuerdo a las especulaciones del mercado. 
+
+## Consideraciones.
+  
+Dado que se va a estudiar sobre series de tiempo, es importante tener en cuenta que el ajuste de modelos debe generar, en los residuales, ruido blanco cuyas características son el hecho de tener media cero, varianza constante y que estos no esten altamente correlacionados.
+
+Considerando esto en la mayoría de los modelos se ultilizara para métrica la [_Prueba de hípotesis de Box-Ljung_](https://itl.nist.gov/div898/handbook/pmc/section4/pmc4481.htm), cuyas hipótesis son: 
+  
+  $H_0$: _Ruido blanco en residuales_ vs $H_1$: _Ausencia de ruido blanco en residuales_
+  
+Esto para poder tener una métrica de la fiabilidad de los respectivos modelos y, por ende, de los pronósticos que éstos generen.
+
+## Movilidad en CDMX (Tránsporte público).
+
+### Análisis exploratorio.
+
+La base de datos cuenta con las diferencias porcentuales del metro, metrobús, trolebús, rtp y ecobici, los cuales son los medios de trásporte mas recurrentes en la Ciudad, estos pueden presentar correlación entre ellos, por lo cual prodríamos omitir alguno para evitar estudiar información muy parecida en las series. 
+
+Consideraremos una alta correlación aquellos por encima de 0.8 en coeficiente de correlación. 
+
+```{r}
+hospitalizados_transporte_movilidad <- read.csv('/cloud/project/hospitalizados-transporte-movilidad.csv')
+movilidad <- hospitalizados_transporte_movilidad[, c('fecha', 'metro', 
+                                                     'metrobus',
+                                                     'trolebus',
+                                                     'rtp', 
+                                                     'ecobici')]
+movilidad <- mutate(movilidad, fecha = as.Date(fecha, '%d/%m/%Y'))
+corr <- cor(movilidad[,-c(1)])
+corr
+```
+Dado esto, omitimos la información tanto de _rtp_ como de _trolebús_.
+Y vemos ahora, de manera gráfica la correlación entre las variables resultantes, notamos que hay correlaciones hasta de 0.79 entre ecobici y metrobús, pero consevaremos estas variables ya que el ecobici es una forma más rápida de transporte y la mayor preferencia de algunas personas. Enfocado al estudio de sus afluencias, es interesante también estudiar este comportamiento.
+
+
+```{r}
+movilidad <- movilidad[ , -4] 
+movilidad <- movilidad[ , -4]
+corr <- cor(movilidad[,-c(1)])
+ggcorrplot(corr, method = "circle", 
+           hc.order = TRUE,
+           lab = TRUE,
+           outline.color = "white",
+           ggtheme = ggplot2::theme_gray,
+           colors = c("#6D9EC1", "white", "#E46726")) +
+  ggtitle("Correlograma de los medios de transporte CDMX") +
+  theme_minimal()
+```
+
+A continuación se presentan histogramas y densidades obtenidas de los datos, notamos que para el metro, los descensos más frecuentes rondan en tre el 40% y 50%, también hay una segunda moda alrededor de 70%, estos resgitros sucedieron al inicio de la restricción social.
+
+El metrobus presenta descensos, en frecuencia relativamente más variables a lo largo del tiempo, siendo las más frecuentes entre 70% y 50%.
+
+Los descensos de afluencia en el uso de ecobici, tienen una mayor frecuencia entre 60% y 70%, siento este rango el más frecuente desde finales de marzo de 2020.
+
+En general, logramos apreciar un descenso importante en la afluencia de estos medios de transporte, lo cuál ers de esperarse. 
+
+```{r}
+par(mfrow=c(2, 2))
+## Histograma y densidad del metro.
+with(movilidad, hist(metro, freq = FALSE,breaks="Sturges", col="lightblue", title='Histograma de 
+       dendsidad de la afluencia en el metro de CDMX'))
+lines(density(movilidad$metro), col="blue")
+
+## Histograma y densidad del metrobus.
+with(movilidad, hist(metrobus, freq = FALSE, breaks="Sturges", col="orange",title='Histograma de 
+      dendsidad de la afluencia en el metrobús de CDMX'))
+lines(density(movilidad$metrobus), col="red")
+
+## Histograma y densidad del ecobici.
+with(movilidad, hist(ecobici, freq = FALSE, breaks="Sturges", col="lightgreen",title='Histograma de 
+      dendsidad de la afluencia en ecobici de CDMX'))
+lines(density(movilidad$ecobici), col="green")
+```
+
+### Series de tiempo.
+
+Iniciemos un pequeño analisis de las respectivas series de estos datos:
+  
+  Se puede notar la gran disminución significativa durante los ultimos días de marzo alcanzando los mayores mínimos alrededor de finales de abril e inicio de mayo.
+
+Es importante señalar que en todas las series se presentan datos atípicos en las fechas:
+  
+  - 16 de septiembre de 2020
+- 2 de noviembre de 2020
+- 16 de noviembre de 2020
+- 25 de diciembre de 2020
+- 1 de enero de 2021
+
+Estas fechas son considerados días festivos, y el hecho que es descenso sea más significativo se puede explicar por las medidas del Gobierno estos días, cerrando ciertas líneas y estaciones. 
+
+```{r}
+####### Serie de tiempo de metro
+metro_p <-ggplot(movilidad)+geom_line(aes(x=fecha,y=metro), color="orange", size=0.5)+
+  geom_point(aes(x=fecha,y=metro), size=0.5)+
+  ggtitle("Serie de tiempo afluencia en el metro")+
+  labs(x="Tiempo desde 24/marzo/2020 al 25/enero/2021", y="diferencia porcentual")+
+  theme_bw()+theme(plot.title = element_text(hjust = 0.5))
+ggplotly(metro_p)
+```
+
+Notamos que el comportamiento de las series de el metro como de metrobús son bastante parecidas, notando una disminución significativa en el mes de enero por el metro, debido a el problema de incendios presentados en estas fechas  [click](https://www.eluniversal.com.mx/metropoli/se-registra-incendio-en-oficinas-del-metro-reportan-un-muerto).
+
+```{r}
+####### Serie de tiempo de metrobus
+metrobus_p<-ggplot(movilidad)+geom_line(aes(x=fecha,y=metrobus), color="red", size=0.5)+
+  geom_point(aes(x=fecha,y=metrobus), size=0.5)+
+  ggtitle("Serie de tiempo de afluencia en el metrobús")+
+  labs(x="Tiempo desde 24/marzo/2020 al 25/enero/2021", y="diferencia porcentual")+
+  theme_bw()+theme(plot.title = element_text(hjust = 0.5))
+ggplotly(metrobus_p)
+```
+
+La serie de la afluencia en ecobici presenta un comportamiento más variable a lo largo del tiempo, presenta sus máximas disminuciones entre abril y julio, lo cual puede causar problemas al momento del ajuste. 
+
+```{r}
+####### Serie de tiempo de ecobici
+ecobico_p<-ggplot(movilidad)+geom_line(aes(x=fecha,y=ecobici), color="green", size=0.5)+
+  geom_point(aes(x=fecha,y=ecobici), size=0.5)+
+  ggtitle("Serie de tiempo de afluencia en ecobici")+
+  labs(x="Tiempo desde 24/marzo/2020 al 25/enero/2021", y="diferencia porcentual") +
+  theme_bw()+theme(plot.title = element_text(hjust = 0.5))
+ggplotly(ecobico_p)
+
+```
+
+### Modelos y predicciones.
+
+Es importante recordar que, al ajustar un modelo, los residuales de este deben comportarse como ruido blanco.
+
+#### Metro
+
+Para el metro, realizamos la serie de tiempo, y utilizamos la función _auto.arima_ para ajustar el mejor modelo posible a los datos. Para comprobar que es un buen modelo, hacemos el test Ljung-Box, obteniendo un p_value = 0.9735, por lo cual los residuales se comportan como ruido blanco, por lo que el modelo puede ser usado para predecir.
+
+```{r}
+ts_metro <- ts(movilidad$metro, start = c(2020, 3,24), 
+               end = c(2021, 1, 25), frequency = 307)
+metro_fit <- auto.arima(ts_metro)
+summary(metro_fit)
+Box.test(residuals(metro_fit), type = 'Ljung-Box')  ## p-value = 0.9735
+```
+```{r}
+pronostico<-forecast(metro_fit,12,level=95)
+plot(pronostico,main="Pronóstico para afluencia en el metro de CDMX.")
+```
+
+NOTA: Las predicciones con series de tiempo con fiables a corto plazo pero van convergiendo a la media al paso de los periodos, por lo que pierden eficacia. Por este motivo las predicciones se realizan para 12 días.
+
+```{r, eval=FALSE}
+sliderInput(inputId='periodo', label ='Elija el periódo de predicción',
+            min=1, max=35, value = 12)
+renderPlot(plot(forecast(metro_fit,input$periodo,level=95),main="Pronóstico para afluencia en el metro de CDMX."))
+```
+
+#### Metrobús
+
+El procedimiento es analógo, este modelo tampoco presento problemas para ajustar un buen modelo para predecir, ya que su p_value = 0.3256, por lo que no se rechaza que los residuales se comporten como ruido blanco, y presento los siguientes resultados:
+
+```{r}
+ts_metrobus <- ts(movilidad$metrobus, start = c(2020, 3,24), 
+               end = c(2021, 1, 25), frequency = 307)
+metrobus_fit <- auto.arima(ts_metrobus)
+summary(metrobus_fit)
+Box.test(residuals(metrobus_fit), type = 'Ljung-Box')  ## p-value = 0.3256
+```
+
+Tratando de mejorar el modelo, se usan medias móviles de orden 3 para poder suavizar un poco la serie de tiempo, posteriormente se vuelve a ajustar el modelo, el cual arrojo un p-value = 0.8823, mucho mayor al modelo anterior, por lo que, estadísticamente los residuales se comportan como ruido blanco.
+
+
+```{r}
+ts_metrobus_m <- ma(ts_metrobus, 3)
+metrobus_arima <- auto.arima(ts_metrobus_m)
+summary(metrobus_arima)
+Box.test(residuals(metrobus_arima), type = 'Ljung-Box') ## ma = 3, p-value = 0.8823
+```
+
+```{r}
+pronostico<-forecast(metrobus_arima,12,level=95)
+plot(pronostico,main="Pronóstico para afluencia en el metrobús de CDMX.")
+```
+
+De igual manera, se pueden apreciar las predicciones para este modelo, a doce días.
+
+#### Ecobici.
+
+El modelo inciar con el método _auto.arima_ arrojo los siguientes resultados, cabe recordar que el comportamiento de esta serie era mucho más variables que las dos pasadas:
+
+```{r}
+ts_ecobici <- ts(movilidad$ecobici, start = c(2020, 3,24), 
+                  end = c(2021, 1, 25), frequency = 307)
+ecobici_fit <- auto.arima(ts_ecobici)
+summary(ecobici_fit)
+Box.test(residuals(ecobici_fit), type = 'Ljung-Box')  ## p-value = 0.2678
+```
+
+Observamos que la función arrojo un modelo ARIMA(2,1,2), con 2 componentes autorregresivos, 2 medias móviles y una diferencia, sin embargo notamos que la prueba _Box-Ljung_ arrojo un p_value = 0.2678, para ciertos níveles de significancia más altos podría no ser un gran modelo.
+
+Al igual que el metodo anterior, usaremos medias móviles de orden 3 para suavizar la serie, obteniendo un modelo ARIMA(5,1,0) con un p-value en la prueba Ljung-Box igual a 0.5439, por lo que es un modelo estadísticamente mejor que es anterior y por lo tanto puede ser usado para hacer pronósticos.
+
+```{r}
+ts_ecobici_m <- ma(ts_ecobici, 3)
+ecobici_arima <- auto.arima(ts_ecobici_m)
+summary(ecobici_arima)
+Box.test(residuals(ecobici_arima), type = 'Ljung-Box') ## ma = 2, p-value = 0.2999
+                                                       ## ma = 3, p-value = 0.5439
+```
+
+```{r}
+pronostico<-forecast(ecobici_arima,12,level=95)
+plot(pronostico,main="Pronóstico para afluencia en ecobici en CDMX.")
+```
+
+## Movilidad en CDMX (Tránsporte particular).
+
+Es interesante igualmente, estudiar el comportamiento de los automoviles particulares en la CDMX, ya que es una de las manera de movílidad más comunes, y por ende, podría ser el más itulizado durante el periodo de pandemia.
+
+### Análisis exploratorio.
+
+La diferencias porcentuales con mayor frecuencia para el uso de autos partuculares ronda, mayormente, en descensos entre 40% y 60%, se presentaron también descensos de 80% en movilidad de vehículos, podría ser explicado por la medidas de _Hoy no círcula_, implementadas por el Gobierno ya que, este programa se extendío a todos los coches para finales de abril [(Más información).](https://www.wibe.com/blog/viajero/hoy-no-circula-fase-3-covid/#:~:text=Desde%20el%2023%20de%20abril,los%20autos%20el%C3%A9ctricos%20o%20h%C3%ADbridos.)
+
+```{r}
+automoviles <- hospitalizados_transporte_movilidad[, c('fecha', 'transito')]
+automoviles <- mutate(automoviles, fecha = as.Date(fecha, '%d/%m/%Y'))
+with(automoviles, hist(transito, freq = FALSE, breaks="Sturges", col="gray"))
+lines(density(automoviles$transito), col="black", lty=3, lwd=4)
+```
+
+### Serie de tiempo.
+
+Esta serie de tiempo ha presentado un comportamiento muy similar a las tres anteriores, presentando sus mayores descensos entre abril y julio, y teniendo una tendencia creciente a partir de este mes antes mencionado.
+
+Los putno atípicos se presnetan en las mismas fechas que las series anteriores, es decir, en los días festivos.
+
+Presenta también un gran descenso a finales de diciembre y principios de enero.
+
+```{r}
+autos_p<-ggplot(automoviles)+geom_line(aes(x=fecha,y=transito), color="purple", size=0.5)+
+  geom_point(aes(x=fecha,y=transito), size=0.5)+
+  ggtitle("Series de tiempo de afluencia en transportes particulares.")+
+  labs(x="Tiempo desde 24/marzo/2020 al 25/enero/2021", y="automovil") +
+  theme_bw()+theme(plot.title = element_text(hjust = 0.5))
+ggplotly(autos_p)
+```
+
+### Modelos y predicciones.
+
+El ajuste de esta serie de tiempo dio los siguientes resultados:
+
+- El mejor modelo ajustado es un ARIMA(5,1,2), con 5 componenetes autorregresivos, una diferencia y dos componenetes de medias móviles.
+- EL p_value de la prueba Box-Ljung dio 0.9489, por lo que los residuales presentan un comportamiento de ruido blanco, y se puede decir que es un buen modelo, por lo que se puede utilizar para predicciones.
+
+```{r}
+ts_autos <- ts(automoviles$transito, start = c(2020, 3,24), 
+                 end = c(2021, 1, 25), frequency = 307)
+autos_fit <- auto.arima(ts_autos)
+summary(autos_fit)
+Box.test(residuals(autos_fit), type = 'Ljung-Box')  ## p-value = 0.9489
+```
+
+```{r}
+pronostico<-forecast(autos_fit,12,level=95)
+plot(pronostico,main="Pronóstico para afluencia de vehículos particulares en CDMX")
+```
+
+## Tráfico en servicios de Internet.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, echo=FALSE}
+  #Lectura de los datos del archivo csv.
+  datos_internet <- read.csv("/cloud/project/Monitoreo de Tráfico de Internet_2.csv", header = TRUE,
+                  sep = ",", check.names = FALSE)
+  datos_internet <- datos_internet %>% select(Fecha, Proveedor, Trafico_Datos_Local)
+  datos_internet <- mutate(datos_internet, Fecha = as.Date(Fecha, "%m/%d/%Y"), 
+                           Trafico_Datos_Local = as.numeric(Trafico_Datos_Local))
+```
+
+De todos los proveedores, seleccionaremos a los 3 que mas datos generan de manera local asi como 1 de los que menos generan.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=10}
+  #Grafica de area.
+  ggplot(datos_internet, aes(x = Fecha, y = Trafico_Datos_Local)) +
+  geom_area(aes(color = Proveedor, fill = Proveedor),
+  alpha = 0.5, position=position_dodge(0.8)) +
+  ggtitle("Trafico de datos durante la pandemia") +
+  xlab("Mes 2020") +
+  ylab("Datos en GB") +
+  theme_minimal() +
+  scale_color_manual(values=c("#00AFBB", "#E7B800", "#CC0000", "#006600", 
+                              "#669999", "#00CCCC", "#660099", "#FC0066", 
+                              "#AF9999", "#FE99FF", "#559955", "#A990CC", 
+                              "#660099", "#CC0066")) +
+  scale_fill_manual(values=c( "#00AFBB", "#E7B800", "#CC0000", "#006600", 
+                              "#669999", "#00CCCC", "#660099", "#FC0066", 
+                              "#AF9999", "#FE99FF", "#559955", "#A990CC", 
+                              "#660099", "#CC0066"))
+```
+
+En este caso fueron seleccionados: Movistar, Unefon, Clarovideo y DirecTV.
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, echo=FALSE}
+  #Separacion de los proveedores seleccionados en data frames unicos.
+  movistar <- filter(datos_internet, Proveedor == "MOVISTAR")
+  claro <- filter(datos_internet, Proveedor == "CLARO")
+  une <- filter(datos_internet, Proveedor == "UNE")
+  directv <- filter(datos_internet, Proveedor == "DIRECTV")
+```
+
+### Series de tiempo.
+Vayamos a realizar un analisis ganeral de las series de tiempo que nos proporcionan los proveeedores de servicios.
+Tras observar cada una de las series, se puede llegar a un punto en comun, todas tienen puntos de inflexion cerca de los meses de Julio, Agosto y Enero, ya que estos son los meses de transicion de vacaciones a clases/trabajo o viceversa por parte de estudiantes o trabajadores; Por motivos de la pandemia, el regreso a labores se debe de realizar de manera puramente virtual y en algunos escasos casos de manera semipresencial. ¿A que va esto?, pues a que todo mundo ahorita depende de servicios de internet o de entretenimiento ya que por decreto oficial, nadie deberia de salir de su casa.
+
+NOTA. Los datos atipicos de las graficas fueron "Normalizados", sustituyendo el dato por el promedio del dato de un dia anterior con el de un dia posterior, esto con el fin de brindar un buen modelo de prediccion.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+grafica_movi <- ggplot(movistar) +
+  geom_line(aes(x=Fecha, y= Trafico_Datos_Local), color="green", size=0.8) +
+  geom_point(aes(x=Fecha, y= Trafico_Datos_Local), size=1) +
+  ggtitle("Movistar") +
+  labs(x="Tiempo", y="Datos (GB)") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplotly(grafica_movi)
+```
+
+Antes que nada, se debe aclarar que la compañia "Movistar" es una empresa de servicios telefonia movil, cuyo proposito es comunicar a los cientos de miles de mexicanos con el mundo exterior y de manera local. En esta grafica se puede observar el alce de la demanda de servicios telefonicos justo cuando empezo el periodo vacacional y una caida una vez se regreso a dias laborales.  
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+grafica_une <- ggplot(une) +
+  geom_line(aes(x=Fecha, y= Trafico_Datos_Local), color="yellow", size=0.8) +
+  geom_point(aes(x=Fecha, y= Trafico_Datos_Local), size=1) +
+  ggtitle("Unefon") +
+  labs(x="Tiempo", y="Datos (GB)") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplotly(grafica_une)
+```
+
+Como dato previo al analisis, se debe aclarar que la compañia "Unefon" es una empresa de servicios telefonia movil, cuyo proposito es comunicar a los cientos de miles de mexicanos con el mundo exterior y de manera local. En esta grafica se puede observar la misma demanda que tuvo movistar, pero con una mayor cantidad de usuarios asociados a esta telefonia al principio, tambien demuestra el alce de la demanda de servicios telefonicos justo cuando empezo el periodo vacacional y una caida una vez se regreso a dias laborales. 
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+grafica_claro <- ggplot(claro) +
+  geom_line(aes(x=Fecha, y= Trafico_Datos_Local), color="red", size=0.8) +
+  geom_point(aes(x=Fecha, y= Trafico_Datos_Local), size=1) +
+  ggtitle("Claro") +
+  labs(x="Tiempo", y="Datos (GB)") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplotly(grafica_claro)
+```
+
+Como dato previo, se debe aclarar que la compañia "Claro" es una empresa de servicios internet y telefonia fija, asi como servicios de entretenimiento en linea, cuyo proposito es de brindar un servicio total a sus clientes. En esta grafica se puede observar un cambio significativo con respecto a las empresas anteriores, como esta es una empresa mas orientado a lo "fijo" y al entretenimiento, por motivos de confinamiento agarro mas fuerza y tuvo un incremento desde el inicio de la pandemia; como las personas se la pasan en su hogar, necesitan una forma de pasar el tiempo y que mejor con los servicios de entretenimiento qye ofrece esta empresa y ademas, si estas en casa, no hay necesidad de tener un plan movil de internet si ya tienes internet fijo. 
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+grafica_directv <- ggplot(directv) +
+  geom_line(aes(x=Fecha, y= Trafico_Datos_Local), color="blue", size=0.8) +
+  geom_point(aes(x=Fecha, y= Trafico_Datos_Local), size=1) +
+  ggtitle("Directv") +
+  labs(x="Tiempo", y="Datos (GB)") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplotly(grafica_directv)
+```
+
+Como dato previo, se debe aclarar que la compañia "Directv" es una empresa de servicios de television por cable, cuyo proposito es de brindar canales exclusivos que no se pueden obtener a traves de television abierta a sus clientes. En esta grafica se puede observar un cambio significativo con respecto a las empresas anteriores, y un comportamiento casi contrario con respecto a Claro, ya que esta tambien provee servicio de entretenimiento, pero ¿Porque?. Muy facil!, el internet agarro gran fuerza, reemplazando asi la television abierta y por cable desde el momento en que salio y empresas exclusivas de entretenimiento que solo pueden ser visitados a traves de internet y de popularidad masiva, aprovecharon la pandemia para lanzar una gran cantidad de espectaculos, logrando asi que muchas personas que tenian television por cable, cancelaran el servicio porque en internet podian encontrar mas variedad y hasta los mismos programas por un precio mas barato o inclusive gratis!
+
+Como breve conclusion de las graficas anteriores, Ante el confinamiento, los servicios de telefonía e internet fijos así como la TV de paga fueron los servicios que tomaron mayor fuerza al elevar sus ingresos y captar más clientes.
+
+### Modelos y Predicciones.
+Es importante recordar que, al ajustar un modelo, los residuales de este deben comportarse como ruido blanco.
+
+Para las empresas a analizar (Movistar, Claro, Unefon y DirecTV), se realizaron series de tiempo, asi como uso de la la función auto.arima para ajustar el mejor modelo posible a los datos. Para comprobar son buenos modelos, se hizo el test Ljung-Box.
+
+#### Movistar.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_movistar = ts(movistar$Trafico_Datos_Local, start = c(2020,3,30),
+                      end = c(2021,1,26), frequency = 305)
+  modelo_arima_movistar <- auto.arima(ts_movistar)
+  summary(modelo_arima_movistar)
+```
+
+Test Ljung-Box:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_movistar), type = 'Ljung-Box')
+```
+
+Se puede observar que el ajuste arrojo un modelo ARIMA (2,1,2), con 2 componentes autorregresivos, 2 medias móviles y una diferencia, Sin embargo notamos que la prueba *Ljung-Box* obtuvo un p_value = 9.996e-06, lo cual nos indica por contraste de hipotesis que los residuales no se comportan como ruido blanco; por lo que el modelo no puede ser usado para predecir.
+
+Para obtener un modelo que nos sirva para predicciones y para corregir la media de los residuales, usaremos medias móviles de orden 2 para suavizar la serie; ya evaluada la serie de tiempo, se logro obtener los siguientes resultados:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_movistar = ts(movistar$Trafico_Datos_Local, start = c(2020,3,30),
+                      end = c(2021,1,26), frequency = 305)
+  #Suavizamos el modelo para obtener una mejor prediccion.
+  ma_ts_movistar <- ma(ts_movistar,2)
+  modelo_arima_movistar <- auto.arima(ma_ts_movistar)
+  summary(modelo_arima_movistar)
+```
+
+Test Ljung-Box para el modelo suavizado:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_movistar), type = 'Ljung-Box')
+```
+
+Tras realizar estas modificaciones, el nuevo ajuste nos arrojo un modelo ARIMA(2,1,0) con 2 componentes autorregresivos, 0 medias móviles y una diferencia. Ahora tras realizar la prueba *Ljung-Box* se obtuvo un p_value = 0.6338, lo cual nos indica que los residuales se comportan como ruido blanco y es un modelo que se puede usar para realizar pronosticos.
+
+Tras haber ajustado el modelo, se pudo obtener el siguiente pronostico:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+  #Ver si es un buen modelo.
+  prediccion_movistar <- forecast(modelo_arima_movistar,10,level=95)
+  plot(prediccion_movistar, main="Pronostico para Movistar.")
+```
+
+#### Claro.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_claro = ts(claro$Trafico_Datos_Local, start = c(2020,3,30),
+              end = c(2021,1,26), frequency=305)
+  modelo_arima_claro <- auto.arima(ts_claro)
+  summary(modelo_arima_claro)
+```
+
+Test Ljung-Box:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_claro), type = 'Ljung-Box')
+```
+
+Se puede observar que el ajuste arrojo un modelo ARIMA (3,1,2), con 3 componentes autorregresivos, 2 medias móviles y una diferencia, Sin embargo notamos que la prueba *Ljung-Box* obtuvo un p_value = 0.0868, lo cual nos indica que los residuales se comportan como ruido blanco. El problemas es que; para muchos níveles de significancia podría no ser un gran modelo. 
+
+Para obtener un modelo que nos sirva para predicciones y para corregir la media de los residuales, agregamos otra diferencia al modelo ARIMA; en base a esto, se logro obtener los siguientes resultados:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_claro = ts(claro$Trafico_Datos_Local, start = c(2020,3,30),
+              end = c(2021,1,26), frequency=305)
+  modelo_arima_claro <- Arima(ts_claro, order = c(3,2,2))
+  summary(modelo_arima_claro)
+```
+
+Test Ljung-Box para el modelo ajustado:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_claro), type = 'Ljung-Box')
+```
+
+Tras realizar estas modificaciones, el nuevo ajuste nos arrojo un modelo ARIMA(3,2,2) con 2 componentes autorregresivos, 2 medias móviles y 2 diferencias. Ahora tras realizar la prueba *Ljung-Box* se obtuvo un p_value = 0.152, lo cual nos indica que los residuales se comportan como ruido blanco y es un modelo mejor que al anterior, pero indica que; para ciertos níveles de significancia más altos podría no ser un gran modelo.
+
+Tras haber ajustado el modelo, se pudo obtener el siguiente pronostico:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+  #Ver si es un buen modelo.
+  prediccion_claro <- forecast(modelo_arima_claro,10,level=95)
+  plot(prediccion_claro, main="Pronostico para Claro")
+```
+
+#### Unefon.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_unefon = ts(une$Trafico_Datos_Local,start = c(2020,3,30),
+                     end = c(2021,1,26), frequency=305)
+  modelo_arima_unefon <- auto.arima(ts_unefon)
+  summary(modelo_arima_unefon)
+```
+
+Test Ljung-Box:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_unefon), type = 'Ljung-Box')
+```
+
+Se puede observar que el ajuste arrojo un modelo ARIMA (4,1,2), con 4 componentes autorregresivos, 2 medias móviles y una diferencia, Sin embargo notamos que la prueba Ljung-Box obtuvo un p_value = 0.6057, lo cual nos indica que los residuales se comportan como ruido blanco y es un buen modelo para generar predicciones.
+
+Tras el ajuste del modelo, se pudo obtener el siguiente pronostico:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+  #Ver si es un buen modelo.
+  prediccion_unefon <- forecast(modelo_arima_unefon, 12, level=95)
+  plot(prediccion_unefon, main="Pronostico para Unefon")
+```
+
+#### DirecTV.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_directv = ts(directv$Trafico_Datos_Local, start = c(2020,3,30),
+                end = c(2021,1,26), frequency=305)
+  modelo_arima_directv <- auto.arima(ts_directv, seasonal=TRUE)
+  summary(modelo_arima_directv)
+```
+
+Test Ljung-Box:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_directv), type = 'Ljung-Box')
+```
+
+Se puede observar que el ajuste arrojo un modelo ARIMA (2,1,2), con 2 componentes autorregresivos, 2 medias móviles y una diferencia, Sin embargo notamos que la prueba Ljung-Box obtuvo un p_value = 0.2161, lo cual nos indica que los residuales se comportan como ruido blanco; pero indica que; para ciertos níveles de significancia más altos podría no ser un gran modelo.
+
+Tras el ajuste del modelo, se pudo obtener el siguiente pronostico:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+  #Ver si es un buen modelo.
+  prediccion_directv <- forecast(modelo_arima_directv, 12, level=95)
+  plot(prediccion_directv, main="Pronostico para Directv")
+```
+
+
+## Precio del dólar.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, echo=FALSE}
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(plotly)
+library(datasets)
+library(taRifx)
+#Paquete para series de tiempo
+#library(tseries)
+library(astsa)
+library(forecast)
+#dsdolar <- read.csv("dolar_maydic2020.csv") 
+dsdolar <- read.csv("/cloud/project/dolar_maydic2020.csv") 
+
+
+#Transformacion de los datasets
+datosdolar2 <- rename(dsdolar, max = Máximo )
+datosdolar2 <- rename(datosdolar2, min = Mínimo)
+datosdolar2<- rename(datosdolar2, fecha = Fecha, var =X..var.  )
+
+datosdolar2 <- mutate(datosdolar2, fecha = as.Date(fecha, "%d.%m.%Y"))
+
+
+
+datosdolar2 <- mutate(datosdolar2, var = as.numeric(var))
+
+dolarmin <- select(datosdolar2,  min, max, Cierre)
+
+
+
+
+#Transformacion de los datasets
+
+datosmut <- read.csv("dolar_cov", header = TRUE,
+                  sep = ",", check.names = FALSE)
+
+```
+
+A lo largo de los 286 días registrados observamos un promedio de 22.08 y 22.04 de apertura y cierre respectivamente. El segundo cuartil (la mediana) se encuentra entre 22.14 y 22.10.
+
+
+El máximo (max) y el mínimo (min) son los picos y los valles que tuvo el valor a lo largo del día.
+A lo largo de los 286 días registrados observamos un promedio de 22.28 y 22.87 de máximo y mínimo respectivamente. El segundo cuartil (la mediana) se encuentra entre 22.25 y 21.93.
+
+
+```{r}
+
+summary( select(datosmut, Apertura, Cierre, max, min))
+
+```
+
+En el gráfico podemos apreciar que es una serie No estacionaria pues su distribución y sus parámetros varian a lo largo de la serie de tiempo, en otras palabras: 
+
+ -La media no es constante pues decrementa a lo largo del tiempo
+ -Su varianza tampoco es una constante.
+ 
+ Cabe recalcar que, por lo general, en los indicadores de activos financieros no se encuentran datos estacionales.
+
+```{r pressure, echo=FALSE}
+#Serie de tiempo de maximos y minimos de la tasa de cambio
+
+serieDolar <- ggplot(datosdolar2, aes(x=fecha, y=max)) + geom_line(color="blue") + 
+  labs(x = "Tiempo", 
+       y = "Valor mínimo y máximo respecto al peso mexicano.",
+       title = paste("Fluctuación del dolar durante 2020")) +
+  geom_line(aes(y = min), color = "red") +
+  theme(axis.text.x = element_text(face = "bold", color="#993333" , size = 10, angle = 45, hjust = 1),
+        axis.text.y = element_text(face = "bold", color="#993333" , size = 10, angle = 45, hjust = 1))
+
+ggplotly(serieDolar)
+
+
+```
+
+Dada la volatilidad que presenta la serie, se suaviza por medio de el uso de medias móviles de orden 3, con el fin de tene una serie más sencilla de ajustar.
+
+
+```{r echo=FALSE}
+# 1. Ajuste de serie de tiempo
+cierre_order <- rev(datosdolar2$Cierre)
+
+serie <- ts(cierre_order,frequency = 207, start = c(2020, 03,20))
+
+
+#descomposicion de la serie de tiempo
+serie1 <- ma(serie, 3) #suaviza los picos de la serie original con las medias moviles
+
+#### Serie de tiepo 
+serieDolar <- ggplot(datosdolar2, aes(x=fecha, y=Cierre )) + geom_line(color="blue") + 
+  labs(x = "Tiempo", 
+       y = "Valor de cierre respecto al peso mexicano.",
+       title = paste("Fluctuación del dolar (precio de cierre)")) +
+  theme(axis.text.x = element_text(face = "bold", color="#993333" , size = 10, angle = 45, hjust = 1),
+        axis.text.y = element_text(face = "bold", color="#993333" , size = 10, angle = 45, hjust = 1))
+ggplotly(serieDolar)
+
+```
+
+Con esta serie suavizada se puede ajustar el mejor modelo posible a los datos, obteniendo un modelo ARIMA(3,1,1), con 3 componentes autorregresivos, una diferencia a los datos y un componente autorregresivo. 
+
+Este modelo produjo un p-value = 0.893, en la prueba Ljung-Box, por lo que los residuales, estadísticamente, se comportan como ruido blanco, por lo que el modelo puede ser usado para obtener pronósticos a corto plazo con un buen nivel de confianza.
+
+```{r}
+prueba1 <- auto.arima(serie1)
+summary(prueba1)
+Box.test(residuals(prueba1), type = 'Ljung-Box') 
+pronos <- forecast(prueba1,12,level=95)
+
+```
+
+El modelo ajustado otorgo estos pronósticos del precio de cierre del dólar:
+
+```{r}
+pronos_dolar <- forecast(prueba1,12,level=95)
+plot(pronos_dolar, main="Pronostico para el precio del dólar. ")
+```
+
+## Conclusiones.
+
+### Respecto a la movilidad:
+
+1. Los modelos ajustados a la serie de tiempo referente al metro de la ciudad de México, pronoótico que las diferencia porcentuales, al estas fechas (principios de febrero), rondarán alrededor del 74% al 75% de reducción de afluencia respecto a un día típico.
+
+2. Los datos registrados del uso de metrobús pronósticaron que la afluencia en este medio de transporte podría registrar un descenso respecto a un día típico de valores entre 32.9% y 35%.
+
+3. La serie de tiempo respecto al uso de la ecobici, al ser la que presentabá mayor variabilidad produjó que los pronóstivcos también presentarán mucha variabilidad, prediciendo descensos en la afluencia en este medio de transporte que varían entre 49% hasta pronósticos de 65%.
+
+4. La serie de tiempo acerca de el uso de autómoviles particulares fue de las series que presentó mejor p-value en la prueba Ljung-Box, y los pronósticos del modelo resultando arrojan descensos en la afluencia desde un 48% hasta un 52.5% respecto a un día típico.
+
+Cabe resaltar que los valores predichos son un pronótico respecto a un modelo matemático y pueden presentar variación respecto a días atípicos que se puedan presentar en el periodo de predicción.
+
+### Respecto al uso de datos:
+
+1. El modelos ajustado para el uso de GB de la telefonía Movistar presentó pronósticos de uso de entre 515 mil y 558 mil GB diarios, mientras que los intervalos de confianza presentaron valores por encima de los 464 GB hasta un posible máximo de 620 GB diarios.
+
+2. Recordemos que uno de los modelos más complejos de ajustar fue el relacionado con el uso de servicios de Marca Claro, para esta prestadora de servicios en línea se predijeron valores de uso de entre 1.15 millones de GB hasta un valor calculado de 1.29 millones de GB diarios.
+
+3. Respecto a la compañía telefónica Unefon, el modelo ajustado arrojo un consumo de GB que podría rondar entre 885 mil GB diarios hasta un posible valor pronósticado máximo de 951 mil GB diarios, comparando las dos telefonías, es la que presenta un mayor uso de GB, y lo pronósticos tambíen consideraron esa tendencia.
+
+4. Para directTV, la prestadora de servicio de televisión de paga, el modelo ajustado pronóstico que el uso de GB de los usuarios al día podrían rondar entre 51.8k Gb diarios hasta un posible máximo de 54.2k GB diarios.
+
+Con esta predicciones se puede notar que, en periodo de pandemia, los usuarios prefieren utilizar servicios de telecomunicación que usar servicios de televisión por cable. 
+
+### Respecto al precio del dólar.
+
+La tendencia del precio del dólar se veía a la baja desde las series de tiempo, mientras que el modelo ajustado pronóstico que el precio podría oscilar entre 19.5 hasta 19.7 pesos, esto con intervalos de confianza deposibles mínimos entre 18.2 hasta posibles máximos de 20.87 pesos; esto para los precios de cierre. Si bien es verdad que esta variable es extremadamente sencible a los cambios y sucesos de diversos sectores, las predicciones oscilan entre intervalos muy pequeños. 
+
+## Notas importantes.
+
+Para interactuar de mejor manera con los datos y resultados hemos desarollado una pequeña aplicación, la cual puede tener acceso mediante el siguiente [link.](https://carlostnorio.shinyapps.io/ProyectoBedu/)
+
+

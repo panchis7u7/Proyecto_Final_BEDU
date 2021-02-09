@@ -1,0 +1,141 @@
+---
+title: "Fluctuaciones del dólar a lo largo de la pandemia"
+author: "Viridiana Escarzaga"
+date: "7/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+A partir del 27 de febrero del año 2020 que fue decretada en México pandemia por covid, lo que para la economía mexicana a significado una crisis economica, viendose reflejado en el precio del dólar. 
+
+El dólar es conosiderado un referente en la economía mundial particularmente para las economías Latinoamericanas, cuyas monedas se han visto depreciadas a lo largo de todo este periodo, afectando para bien o para mal otras industrias, repercutiendo tanto en la inflación como en la deuda publica.  
+
+" El desarrollo de la pandemia y la expectativa de recuperación económica global son los principales factores fundamentales que determinan el tipo de cambio"
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, echo=FALSE}
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(plotly)
+library(datasets)
+library(taRifx)
+#Paquete para series de tiempo
+#library(tseries)
+library(astsa)
+library(forecast)
+#dsdolar <- read.csv("dolar_maydic2020.csv") 
+dsdolar <- read.csv("dolar_maydic2020.csv") 
+
+
+#Transformacion de los datasets
+datosdolar2 <- rename(dsdolar, max = MÃ.ximo )
+datosdolar2 <- rename(datosdolar2, min = MÃ.nimo)
+datosdolar2<- rename(datosdolar2, fecha = ï..Fecha, var =X..var.  )
+
+datosdolar2 <- mutate(datosdolar2, fecha = as.Date(fecha, "%d.%m.%Y"))
+
+
+
+datosdolar2 <- mutate(datosdolar2, var = as.numeric(var))
+
+dolarmin <- select(datosdolar2,  min, max)
+names(datosdolar2)
+
+
+
+
+#Transformacion de los datasets
+
+datosmut <- read.csv("dolar_cov", header = TRUE,
+                  sep = ",", check.names = FALSE)
+
+
+
+
+```
+
+El data set a analizar contempla la fluctuación del tipo de cambio a partir del viernes 20 de marzo cuando se decreto la cuarentena y las medidas de quedarse en casa, y de solo contemplar actividades escenciales se llevaron a cabo y concluye el ultimo día del año 2020. 
+
+
+La apertura y el cierre por día son indicadores que da la bolsa de valores para poder observar la diferencia ente estos de acuerdo a las especulaciones del mercado. 
+
+
+
+```{r mtcars}
+
+summary( select(datosmut, Apertura, Cierre, max, min))
+
+
+```
+
+A lo largo de los 286 días registrados observamos un promedio de 22.08 y 22.04 de apertura y cierre respectivamente. El segundo cuartil (la mediana) se encuentra entre 22.14 y 22.10.
+
+
+El máximo (max) y el mínimo (min) son los picos y los valles que tuvo el valor a lo largo del día.
+A lo largo de los 286 días registrados observamos un promedio de 22.28 y 22.87 de máximo y mínimo respectivamente. El segundo cuartil (la mediana) se encuentra entre 22.25 y 21.93.
+
+
+En el gráfico podemos apreciar que es una serie No estacionaria pues su distribución y sus parametros varian a lo largo de la serie de tiempo. 
+ -La media no es constante pues decrementa a lo largo del tiempo
+ -Su varianza tampoco es una constante.
+ 
+ Por lo general en indicadores de activos financieros no se encuentran datos estacionales.
+
+```{r pressure, echo=FALSE}
+#Serie de tiempo de maximos y minimos de la tasa de cambio
+
+serieDolar <- ggplot(datosdolar2, aes(x=fecha, y=max)) + geom_line(color="blue") + 
+  labs(x = "mes", 
+       y = "máximo y mínimo valor",
+       title = paste("Fluctuación del dolar")) +
+  geom_line(aes(y = min), color = "red") +
+  theme(axis.text.x = element_text(face = "bold", color="#993333" , size = 10, angle = 45, hjust = 1),
+        axis.text.y = element_text(face = "bold", color="#993333" , size = 10, angle = 45, hjust = 1))
+
+
+serieDolar
+
+
+```
+Para suavizar la línea de tendencia por medio de sus promedios móviles se ajusta la línea de serie de tiempo.
+
+
+```{r echo=FALSE}
+# 1. Ajuste de serie de tiempo
+
+serie <- ts(dolarmin$min,frequency = 365, start = c(2020, 03,20))
+
+
+#descomposicion de la serie de tiempo
+serie1 <- ma(serie, 3) #suaviza los picos de la serie original con las medias moviles
+
+tsgraph <- plot(serie1) #grafica de la serie de tiempo
+
+```
+
+Podremos obtener un pronostico aproximado con un índice de confianza del 83%
+
+```{r echo=FALSE}
+prueba1 <- auto.arima(serie1)
+
+Box.test(residuals(prueba1), type = 'Ljung-Box') 
+pronos <- forecast(prueba1,12,level=95)
+
+
+autoplot(pronos, main= "Prónostico Dolar/peso MXN")
+
+```
+
+
+
+
+
+
+
+
+

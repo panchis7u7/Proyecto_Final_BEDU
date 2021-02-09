@@ -1,0 +1,293 @@
+---
+title: "Trafico de datos en tiempo de SARS-COV-II"
+author: "Carlos Sebastian Madrigal Rodriguez"
+date: "2/7/2021"
+output: 
+  prettydoc::html_pretty:
+    theme: tactile
+    highlight: github
+---
+
+<style>
+body {
+  text-align: justify;
+  width: 100%;
+}
+</style>
+
+```{r, echo=FALSE}
+#Linux
+htmltools::img(src = knitr::image_uri(file.path('/cloud/project/BEDU.jpg')), 
+               alt = 'logo', 
+               style = 'position:absolute; top:0; right:0; padding:10px;')
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(prettydoc)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(forecast)
+```
+### Introduccion.
+Tras el brote de la COVID-19, cada vez más personas trabajan, estudian y socializan desde sus casas. A lo largo de la cadena de valor de Internet, los operadores de comunicaciones, los proveedores de contenido y servicios en la nube, así como también los puntos de intercambio de Internet (IXP), han experimentado hasta un 60% más de tráfico de Internet en comparación con el tráfico previo al brote. En esta situación sin precedentes, la resiliencia y la capacidad de las redes de banda ancha se han vuelto aún más esenciales. [(consulte mas aqui)](https://asiet.lat/magazine-digital/como-la-covid-19-afecto-el-trafico-de-internet-y-que-aprendimos-hasta-ahora/)
+
+### Datos
+- El trafico diario de internet se extrajo del portal abierto de la comision de regulacion de comunicaciones del estado de colombia. Varios de los proveedores de servicios digitales son reconocidos y usados a lo largo de todo el continente americano. [(consulte mas aqui)](https://www.postdata.gov.co/)
+
+La información de trafico diario reportado por los Proveedores de Servicio de Internet, fue recopilada desde el 30 de marzo del 2020 hasta el 26 de enero del 2021. [(Obtenidos aqui)](https://www.postdata.gov.co/dataset/tr%C3%A1fico-de-internet-covid-19/resource/c9d5111e-d303-4d7e-8df1-a8f0766ba439#{})
+
+La base de datos proporcionada, nos brinda la cantidad de datos (en GB) que circulan a traves de distintos proveedores de servicios digitales por medio de su infraestructura de red. Este dataset contempla distintos provedores que presentan comportamientos identicos a lo largo e la pandemia, por lo cual podrian ser omitidos para evitar estudiar informacion muy parecida en las series.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, echo=FALSE}
+  #Lectura de los datos del archivo csv.
+  datos_internet <- read.csv("/cloud/project/Monitoreo de Tráfico de Internet_2.csv", header = TRUE,
+                  sep = ",", check.names = FALSE)
+  datos_internet <- datos_internet %>% select(Fecha, Proveedor, Trafico_Datos_Local)
+  datos_internet <- mutate(datos_internet, Fecha = as.Date(Fecha, "%m/%d/%Y"), 
+                           Trafico_Datos_Local = as.numeric(Trafico_Datos_Local))
+```
+
+De todos los proveedores, seleccionaremos a los 3 que mas datos generan de manera local asi como 1 de los que menos generan.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=10}
+  #Grafica de area.
+  ggplot(datos_internet, aes(x = Fecha, y = Trafico_Datos_Local)) +
+  geom_area(aes(color = Proveedor, fill = Proveedor),
+  alpha = 0.5, position=position_dodge(0.8)) +
+  ggtitle("Trafico de datos durante la pandemia") +
+  xlab("Mes 2020") +
+  ylab("Datos en GB") +
+  theme_minimal() +
+  scale_color_manual(values=c("#00AFBB", "#E7B800", "#CC0000", "#006600", 
+                              "#669999", "#00CCCC", "#660099", "#FC0066", 
+                              "#AF9999", "#FE99FF", "#559955", "#A990CC", 
+                              "#660099", "#CC0066")) +
+  scale_fill_manual(values=c( "#00AFBB", "#E7B800", "#CC0000", "#006600", 
+                              "#669999", "#00CCCC", "#660099", "#FC0066", 
+                              "#AF9999", "#FE99FF", "#559955", "#A990CC", 
+                              "#660099", "#CC0066"))
+```
+
+En este caso fueron seleccionados: Movistar, Unefon, Clarovideo y DirecTV.
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, echo=FALSE}
+  #Separacion de los proveedores seleccionados en data frames unicos.
+  movistar <- filter(datos_internet, Proveedor == "MOVISTAR")
+  claro <- filter(datos_internet, Proveedor == "CLARO")
+  une <- filter(datos_internet, Proveedor == "UNE")
+  directv <- filter(datos_internet, Proveedor == "DIRECTV")
+```
+
+
+<hr></hr>
+### Series de tiempo.
+Vayamos a realizar un analisis ganeral de las series de tiempo que nos proporcionan los proveeedores de servicios.
+Tras observar cada una de las series, se puede llegar a un punto en comun, todas tienen puntos de inflexion cerca de los meses de Julio, Agosto y Enero, ya que estos son los meses de transicion de vacaciones a clases/trabajo o viceversa por parte de estudiantes o trabajadores; Por motivos de la pandemia, el regreso a labores se debe de realizar de manera puramente virtual y en algunos escasos casos de manera semipresencial. ¿A que va esto?, pues a que todo mundo ahorita depende de servicios de internet o de entretenimiento ya que por decreto oficial, nadie deberia de salir de su casa.
+
+NOTA. Los datos atipicos de las graficas fueron "Normalizados", sustituyendo el dato por el promedio del dato de un dia anterior con el de un dia posterior, esto con el fin de brindar un buen modelo de prediccion.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+grafica_movi <- ggplot(movistar) +
+  geom_line(aes(x=Fecha, y= Trafico_Datos_Local), color="green", size=0.8) +
+  geom_point(aes(x=Fecha, y= Trafico_Datos_Local), size=1) +
+  ggtitle("Movistar") +
+  labs(x="Tiempo", y="Datos (GB)") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplotly(grafica_movi)
+```
+
+Antes que nada, se debe aclarar que la compañia "Movistar" es una empresa de servicios telefonia movil, cuyo proposito es comunicar a los cientos de miles de mexicanos con el mundo exterior y de manera local. En esta grafica se puede observar el alce de la demanda de servicios telefonicos justo cuando empezo el periodo vacacional y una caida una vez se regreso a dias laborales.  
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+grafica_une <- ggplot(une) +
+  geom_line(aes(x=Fecha, y= Trafico_Datos_Local), color="yellow", size=0.8) +
+  geom_point(aes(x=Fecha, y= Trafico_Datos_Local), size=1) +
+  ggtitle("Unefon") +
+  labs(x="Tiempo", y="Datos (GB)") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplotly(grafica_une)
+```
+
+Como dato previo al analisis, se debe aclarar que la compañia "Unefon" es una empresa de servicios telefonia movil, cuyo proposito es comunicar a los cientos de miles de mexicanos con el mundo exterior y de manera local. En esta grafica se puede observar la misma demanda que tuvo movistar, pero con una mayor cantidad de usuarios asociados a esta telefonia al principio, tambien demuestra el alce de la demanda de servicios telefonicos justo cuando empezo el periodo vacacional y una caida una vez se regreso a dias laborales. 
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+grafica_claro <- ggplot(claro) +
+  geom_line(aes(x=Fecha, y= Trafico_Datos_Local), color="red", size=0.8) +
+  geom_point(aes(x=Fecha, y= Trafico_Datos_Local), size=1) +
+  ggtitle("Claro") +
+  labs(x="Tiempo", y="Datos (GB)") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplotly(grafica_claro)
+```
+
+Como dato previo, se debe aclarar que la compañia "Claro" es una empresa de servicios internet y telefonia fija, asi como servicios de entretenimiento en linea, cuyo proposito es de brindar un servicio total a sus clientes. En esta grafica se puede observar un cambio significativo con respecto a las empresas anteriores, como esta es una empresa mas orientado a lo "fijo" y al entretenimiento, por motivos de confinamiento agarro mas fuerza y tuvo un incremento desde el inicio de la pandemia; como las personas se la pasan en su hogar, necesitan una forma de pasar el tiempo y que mejor con los servicios de entretenimiento qye ofrece esta empresa y ademas, si estas en casa, no hay necesidad de tener un plan movil de internet si ya tienes internet fijo. 
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+grafica_directv <- ggplot(directv) +
+  geom_line(aes(x=Fecha, y= Trafico_Datos_Local), color="blue", size=0.8) +
+  geom_point(aes(x=Fecha, y= Trafico_Datos_Local), size=1) +
+  ggtitle("Directv") +
+  labs(x="Tiempo", y="Datos (GB)") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplotly(grafica_directv)
+```
+
+Como dato previo, se debe aclarar que la compañia "Directv" es una empresa de servicios de television por cable, cuyo proposito es de brindar canales exclusivos que no se pueden obtener a traves de television abierta a sus clientes. En esta grafica se puede observar un cambio significativo con respecto a las empresas anteriores, y un comportamiento casi contrario con respecto a Claro, ya que esta tambien provee servicio de entretenimiento, pero ¿Porque?. Muy facil!, el internet agarro gran fuerza, reemplazando asi la television abierta y por cable desde el momento en que salio y empresas exclusivas de entretenimiento que solo pueden ser visitados a traves de internet y de popularidad masiva, aprovecharon la pandemia para lanzar una gran cantidad de espectaculos, logrando asi que muchas personas que tenian television por cable, cancelaran el servicio porque en internet podian encontrar mas variedad y hasta los mismos programas por un precio mas barato o inclusive gratis!
+
+Como breve conclusion de las graficas anteriores, Ante el confinamiento, los servicios de telefonía e internet fijos así como la TV de paga fueron los servicios que tomaron mayor fuerza al elevar sus ingresos y captar más clientes.
+
+<hr></hr>
+### Modelos y Predicciones.
+Es importante recordar que, al ajustar un modelo, los residuales de este deben comportarse como ruido blanco.
+
+Para las empresas a analizar (Movistar, Claro, Unefon y DirecTV), se realizaron series de tiempo, asi como uso de la la función auto.arima para ajustar el mejor modelo posible a los datos. Para comprobar son buenos modelos, se hizo el test Ljung-Box.
+
+### Movistar.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_movistar = ts(movistar$Trafico_Datos_Local, start = c(2020,3,30),
+                      end = c(2021,1,26), frequency = 305)
+  modelo_arima_movistar <- auto.arima(ts_movistar)
+  summary(modelo_arima_movistar)
+```
+
+Test Ljung-Box:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_movistar), type = 'Ljung-Box')
+```
+
+Se puede observar que el ajuste arrojo un modelo ARIMA (2,1,2), con 2 componentes autorregresivos, 2 medias móviles y una diferencia, Sin embargo notamos que la prueba *Ljung-Box* obtuvo un p_value = 9.996e-06, lo cual nos indica por contraste de hipotesis que los residuales no se comportan como ruido blanco; por lo que el modelo no puede ser usado para predecir.
+
+Para obtener un modelo que nos sirva para predicciones y para corregir la media de los residuales, usaremos medias móviles de orden 2 para suavizar la serie; ya evaluada la serie de tiempo, se logro obtener los siguientes resultados:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_movistar = ts(movistar$Trafico_Datos_Local, start = c(2020,3,30),
+                      end = c(2021,1,26), frequency = 305)
+  #Suavizamos el modelo para obtener una mejor prediccion.
+  ma_ts_movistar <- ma(ts_movistar,2)
+  modelo_arima_movistar <- auto.arima(ma_ts_movistar)
+  summary(modelo_arima_movistar)
+```
+
+Test Ljung-Box para el modelo suavizado:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_movistar), type = 'Ljung-Box')
+```
+
+Tras realizar estas modificaciones, el nuevo ajuste nos arrojo un modelo ARIMA(2,1,0) con 2 componentes autorregresivos, 0 medias móviles y una diferencia. Ahora tras realizar la prueba *Ljung-Box* se obtuvo un p_value = 0.6338, lo cual nos indica que los residuales se comportan como ruido blanco y es un modelo que se puede usar para realizar pronosticos.
+
+Tras haber ajustado el modelo, se pudo obtener el siguiente pronostico:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+  #Ver si es un buen modelo.
+  prediccion_movistar <- forecast(modelo_arima_movistar,10,level=95)
+  plot(prediccion_movistar, main="Pronostico para Movistar.")
+```
+
+### Claro.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_claro = ts(claro$Trafico_Datos_Local, start = c(2020,3,30),
+              end = c(2021,1,26), frequency=305)
+  modelo_arima_claro <- auto.arima(ts_claro)
+  summary(modelo_arima_claro)
+```
+
+Test Ljung-Box:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_claro), type = 'Ljung-Box')
+```
+
+Se puede observar que el ajuste arrojo un modelo ARIMA (3,1,2), con 3 componentes autorregresivos, 2 medias móviles y una diferencia, Sin embargo notamos que la prueba *Ljung-Box* obtuvo un p_value = 0.0868, lo cual nos indica que los residuales se comportan como ruido blanco. El problemas es que; para muchos níveles de significancia podría no ser un gran modelo. 
+
+Para obtener un modelo que nos sirva para predicciones y para corregir la media de los residuales, agregamos otra diferencia al modelo ARIMA; en base a esto, se logro obtener los siguientes resultados:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_claro = ts(claro$Trafico_Datos_Local, start = c(2020,3,30),
+              end = c(2021,1,26), frequency=305)
+  modelo_arima_claro <- Arima(ts_claro, order = c(3,2,2))
+  summary(modelo_arima_claro)
+```
+
+Test Ljung-Box para el modelo ajustado:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_claro), type = 'Ljung-Box')
+```
+
+Tras realizar estas modificaciones, el nuevo ajuste nos arrojo un modelo ARIMA(3,2,2) con 2 componentes autorregresivos, 2 medias móviles y 2 diferencias. Ahora tras realizar la prueba *Ljung-Box* se obtuvo un p_value = 0.152, lo cual nos indica que los residuales se comportan como ruido blanco y es un modelo mejor que al anterior, pero indica que; para ciertos níveles de significancia más altos podría no ser un gran modelo.
+
+Tras haber ajustado el modelo, se pudo obtener el siguiente pronostico:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+  #Ver si es un buen modelo.
+  prediccion_claro <- forecast(modelo_arima_claro,10,level=95)
+  plot(prediccion_claro, main="Pronostico para Claro")
+```
+
+### Unefon.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_unefon = ts(une$Trafico_Datos_Local,start = c(2020,3,30),
+                     end = c(2021,1,26), frequency=305)
+  modelo_arima_unefon <- auto.arima(ts_unefon)
+  summary(modelo_arima_unefon)
+```
+
+Test Ljung-Box:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_unefon), type = 'Ljung-Box')
+```
+
+Se puede observar que el ajuste arrojo un modelo ARIMA (4,1,2), con 4 componentes autorregresivos, 2 medias móviles y una diferencia, Sin embargo notamos que la prueba Ljung-Box obtuvo un p_value = 0.5903, lo cual nos indica que los residuales se comportan como ruido blanco y es un buen modelo para generar predicciones.
+
+Tras el ajuste del modelo, se pudo obtener el siguiente pronostico:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+  #Ver si es un buen modelo.
+  prediccion_unefon <- forecast(modelo_arima_unefon, 12, level=95)
+  plot(prediccion_unefon, main="Pronostico para Unefon")
+```
+
+### DirecTV.
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  ts_directv = ts(directv$Trafico_Datos_Local, start = c(2020,3,30),
+                end = c(2021,1,26), frequency=305)
+  modelo_arima_directv <- auto.arima(ts_directv, seasonal=TRUE)
+  summary(modelo_arima_directv)
+```
+
+Test Ljung-Box:
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE}
+  #Ver si es un buen modelo.
+  Box.test(residuals(modelo_arima_directv), type = 'Ljung-Box')
+```
+
+Se puede observar que el ajuste arrojo un modelo ARIMA (2,1,2), con 2 componentes autorregresivos, 2 medias móviles y una diferencia, Sin embargo notamos que la prueba Ljung-Box obtuvo un p_value = 0.2161, lo cual nos indica que los residuales se comportan como ruido blanco; pero indica que; para ciertos níveles de significancia más altos podría no ser un gran modelo.
+
+Tras el ajuste del modelo, se pudo obtener el siguiente pronostico:
+
+```{r message=FALSE, warning=FALSE, comment=' ', eval=TRUE, fig.asp = 0.6, fig.width=8, out.width = "100%"}
+  #Ver si es un buen modelo.
+  prediccion_directv <- forecast(modelo_arima_directv, 12, level=95)
+  plot(prediccion_directv, main="Pronostico para Directv")
+```
+
+```{r}
+par(mfrow=c(2,2))  
+plot(prediccion_movistar, main="Pronostico para Movistar.")
+plot(prediccion_claro, main="Pronostico para Claro")
+plot(prediccion_unefon, main="Pronostico para Unefon")
+plot(prediccion_directv, main="Pronostico para Directv")
+```
